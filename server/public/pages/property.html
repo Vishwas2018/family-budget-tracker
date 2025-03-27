@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Properties - Family Budget Tracker</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Family Budget</h1>
+                <button id="closeSidebar" class="close-sidebar"><i class="fas fa-times"></i></button>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                    <li><a href="income.html"><i class="fas fa-wallet"></i> Income</a></li>
+                    <li><a href="expense.html"><i class="fas fa-shopping-cart"></i> Expenses</a></li>
+                    <li class="active"><a href="property.html"><i class="fas fa-home"></i> Properties</a></li>
+                    <li><a href="reminder.html"><i class="fas fa-bell"></i> Reminders</a></li>
+                    <li><a href="account.html"><i class="fas fa-university"></i> Accounts</a></li>
+                    <li><a href="reports.html"><i class="fas fa-chart-pie"></i> Reports</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <button id="toggleSidebar" class="toggle-sidebar"><i class="fas fa-bars"></i></button>
+                <div class="user-info" id="userInfo">
+                    <span class="user-greeting">Welcome, <span id="userName">User</span>!</span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="page-header">
+                    <h1>Properties</h1>
+                    <button id="addPropertyBtn" class="btn primary"><i class="fas fa-plus"></i> Add Property</button>
+                </div>
+                <div id="alertBox" class="alert" style="display: none;"></div>
+
+                <!-- Property Summary Cards -->
+                <div class="summary-cards">
+                    <div class="card summary-card">
+                        <div class="summary-icon income"><i class="fas fa-home"></i></div>
+                        <div class="summary-details">
+                            <h3>Total Properties</h3>
+                            <p class="summary-amount" id="totalProperties">0</p>
+                        </div>
+                    </div>
+                    <div class="card summary-card">
+                        <div class="summary-icon income"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="summary-details">
+                            <h3>Total Value</h3>
+                            <p class="summary-amount" id="totalValue">$0.00</p>
+                        </div>
+                    </div>
+                    <div class="card summary-card">
+                        <div class="summary-icon expense"><i class="fas fa-chart-line"></i></div>
+                        <div class="summary-details">
+                            <h3>Monthly Expenses</h3>
+                            <p class="summary-amount" id="monthlyExpenses">$0.00</p>
+                        </div>
+                    </div>
+                    <div class="card summary-card">
+                        <div class="summary-icon income"><i class="fas fa-hand-holding-usd"></i></div>
+                        <div class="summary-details">
+                            <h3>Monthly Income</h3>
+                            <p class="summary-amount" id="monthlyIncome">$0.00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Property Cards -->
+                <div class="property-cards" id="propertyCards">
+                    <!-- Property cards will be loaded here -->
+                    <div class="property-placeholder">
+                        <p>Loading properties...</p>
+                    </div>
+                </div>
+
+                <!-- Coming Soon Message -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Property Management</h3>
+                    </div>
+                    <div class="coming-soon">
+                        <i class="fas fa-tools coming-soon-icon"></i>
+                        <h2>Feature Coming Soon!</h2>
+                        <p>We're working on building a comprehensive property management feature to help you track
+                            properties, mortgages, and rental income.</p>
+                        <p>Here's what you'll be able to do:</p>
+                        <ul>
+                            <li>Track multiple properties (primary residence, rental properties, etc.)</li>
+                            <li>Monitor property values and equity growth</li>
+                            <li>Manage mortgage information and payments</li>
+                            <li>Track rental income and expenses</li>
+                            <li>Set reminders for property taxes and insurance</li>
+                            <li>Analyze property ROI and performance metrics</li>
+                        </ul>
+                        <p>Check back soon for updates!</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/reminderNotification.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/app.js"></script>
+    <script src="../js/auth.js"></script>
+</body>
+
+</html>
