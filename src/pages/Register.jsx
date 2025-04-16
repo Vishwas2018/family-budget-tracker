@@ -1,85 +1,55 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 
-import axios from 'axios';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 
+/**
+ * Register page component
+ * Handles new user registration
+ */
 function Register() {
+  const { isAuthenticated, register: registerUser, registerStatus } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { login } = useAuth();
-
+  const [passwordError, setPasswordError] = useState('');
+  
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear password error when user types in either password field
+    if (name === 'password' || name === 'confirmPassword') {
+      setPasswordError('');
+    }
   };
-
-  const handleSubmit = async (e) => {
+  
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
     
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
+      setPasswordError('Passwords do not match');
       return;
     }
     
-    try {
-      const registerData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      };
-      
-      const response = await axios.post('/api/users/register', registerData, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      // Use auth context login function
-      login(response.data.user, response.data.token);
-      
-      // Redirect to dashboard
-      navigate('/dashboard');
-    } catch (err) {
-      console.error('Registration error:', err.response?.data || err.message);
-      
-      // Handle different error scenarios
-      if (err.response) {
-        // Server responded with an error status
-        if (err.response.status === 400) {
-          setError(err.response.data?.message || 'This email may already be registered.');
-        } else {
-          setError('Registration failed. Please try again later.');
-        }
-      } else if (err.request) {
-        // Request was made but no response
-        setError('Cannot connect to the server. Please check your internet connection.');
-      } else {
-        // Something else caused the error
-        setError('An unexpected error occurred. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
+    // Send registration data without confirmPassword
+    const { confirmPassword, ...registrationData } = formData;
+    registerUser(registrationData);
   };
-
+  
   return (
     <div className="register-container">
       <h2>Create Your <span>Account</span></h2>
-      {error && <div className="error-message">{error}</div>}
+      
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="name">Full Name</label>
@@ -93,6 +63,7 @@ function Register() {
             required
           />
         </div>
+        
         <div className="form-group">
           <label htmlFor="email">Email Address</label>
           <input
@@ -105,6 +76,7 @@ function Register() {
             required
           />
         </div>
+        
         <div className="form-group">
           <label htmlFor="password">Password</label>
           <input
@@ -115,9 +87,10 @@ function Register() {
             onChange={handleChange}
             placeholder="Min. 6 characters"
             required
-            minLength="6"
+            minLength={6}
           />
         </div>
+        
         <div className="form-group">
           <label htmlFor="confirmPassword">Confirm Password</label>
           <input
@@ -128,13 +101,20 @@ function Register() {
             onChange={handleChange}
             placeholder="Confirm your password"
             required
-            minLength="6"
+            minLength={6}
           />
+          {passwordError && <p className="error-text">{passwordError}</p>}
         </div>
-        <button type="submit" className={loading ? 'loading' : ''} disabled={loading}>
-          {loading ? 'Creating Account...' : 'Create Account'}
+        
+        <button 
+          type="submit" 
+          className={registerStatus === 'pending' ? 'loading' : ''}
+          disabled={registerStatus === 'pending'}
+        >
+          {registerStatus === 'pending' ? 'Creating Account...' : 'Create Account'}
         </button>
       </form>
+      
       <p>
         Already have an account? <Link to="/login">Sign in</Link>
       </p>

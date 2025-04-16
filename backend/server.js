@@ -1,18 +1,39 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
+const path = require('path');
+const helmet = require('helmet'); // Add helmet for security headers
 
-// Load environment variables
-dotenv.config();
-
-// Routes
+// Import config and routes
+const config = require('./config/config');
 const userRoutes = require('./routes/userRoutes');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // Initialize express
 const app = express();
 
-// Middleware
+// Security Middleware
+app.use(helmet()); // Adds various HTTP headers for security
+
+// Rate limiting to prevent brute force attacks
+const rateLimit = require('express-rate-limit');
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 login attempts per window
+  message: { message: 'Too many login attempts, please try again later' },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiter to login and register routes
+app.use('/api/users/login', loginLimiter);
+app.use('/api/users/register', rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // limit each IP to 5 register attempts per hour
+  message: { message: 'Too many accounts created, please try again later' },
+}));
+
+// CORS configuration with secure defaults
 app.use(cors({
   origin: function(origin, callback) {
     const allowedOrigins = [
@@ -24,51 +45,116 @@ app.use(cors({
     ];
     
     // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      return callback(null, true);
+    if (!origin || config.env === 'development' || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    
-    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
+// Request Parsing Middleware
+app.use(express.json({ limit: '10kb' })); // Limit size of JSON payloads
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Log requests for debugging
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
+// Logging middleware for development
+if (config.env === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+  
+  // Add morgan for more detailed logging in development
+  const morgan = require('morgan');
+  app.use(morgan('dev'));
+}
 
-// Connect to MongoDB
+// Connect to MongoDB with enhanced options
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .connect(config.mongoUri, {
+    // Options are now managed automatically by Mongoose 6+
+  })
+  .then(async () => {
+    console.log('MongoDB connected successfully');
+    
+    // Initialize database with default data
+    try {
+      // Import models for initialization
+      const Category = require('./models/Category');
+      
+      // Ensure default categories exist
+      await Category.ensureDefaultCategories();
+      console.log('Default categories initialized');
+    } catch (error) {
+      console.error('Error initializing default data:', error);
+    }
+  })
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // Exit on failure
+  });
 
-// Route middleware
+// Import routes
+const transactionRoutes = require('./routes/transactionRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+
+// API Routes
 app.use('/api/users', userRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/categories', categoryRoutes);
+
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', environment: config.env });
+});
 
 // Basic route
 app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
+// Serve static assets in production
+if (config.env === 'production') {
+  // Set static folder
+  app.use(express.static(path.join(__dirname, '../build')));
+  
+  // Any route that's not api will be redirected to index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../build', 'index.html'));
+  });
+}
+
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({ 
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+app.use(notFound);
+app.use(errorHandler);
+
+// Start server
+const PORT = config.port;
+const server = app.listen(PORT, () => {
+  console.log(`Server running in ${config.env} mode on port ${PORT}`);
+  if (config.env === 'development') {
+    console.log(`API available at http://localhost:${PORT}`);
+  }
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  // Close server & exit process
+  server.close(() => {
+    process.exit(1);
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API available at http://localhost:${PORT}`);
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
 });
+
+module.exports = server; // Export for testing
