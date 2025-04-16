@@ -10,8 +10,15 @@ const authService = {
    * @returns {Promise} Promise with the API response
    */
   register: async (userData) => {
-    const response = await apiClient.post('/users/register', userData);
-    return response.data;
+    try {
+      console.log('Registering user:', userData.email);
+      const response = await apiClient.post('/users/register', userData);
+      console.log('Registration successful');
+      return response.data;
+    } catch (error) {
+      console.error('Registration error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   /**
@@ -20,8 +27,15 @@ const authService = {
    * @returns {Promise} Promise with the API response
    */
   login: async (credentials) => {
-    const response = await apiClient.post('/users/login', credentials);
-    return response.data;
+    try {
+      console.log('Logging in user:', credentials.email);
+      const response = await apiClient.post('/users/login', credentials);
+      console.log('Login successful');
+      return response.data;
+    } catch (error) {
+      console.error('Login error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   /**
@@ -29,8 +43,13 @@ const authService = {
    * @returns {Promise} Promise with the API response
    */
   getProfile: async () => {
-    const response = await apiClient.get('/users/profile');
-    return response.data;
+    try {
+      const response = await apiClient.get('/users/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Get profile error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   /**
@@ -39,8 +58,13 @@ const authService = {
    * @returns {Promise} Promise with the API response
    */
   updateProfile: async (profileData) => {
-    const response = await apiClient.put('/users/profile', profileData);
-    return response.data;
+    try {
+      const response = await apiClient.put('/users/profile', profileData);
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   /**
@@ -49,9 +73,12 @@ const authService = {
    */
   checkAuth: async () => {
     try {
+      console.log('Checking auth status');
       await apiClient.get('/users/profile');
+      console.log('Auth check: User is authenticated');
       return true;
     } catch (error) {
+      console.log('Auth check: User is not authenticated', error.message);
       return false;
     }
   }

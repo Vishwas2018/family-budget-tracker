@@ -1,5 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
-
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 
@@ -8,30 +7,52 @@ import { useState } from 'react';
  * Handles user authentication
  */
 function Login() {
-  const { isAuthenticated, login, loginStatus } = useAuth();
+  const { login, error, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-  
-  // Redirect if already authenticated
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const [formError, setFormError] = useState('');
   
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear errors when user types
+    if (formError) setFormError('');
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    login(formData);
+    
+    // Basic validation
+    if (!formData.email || !formData.password) {
+      setFormError('Please fill in all fields');
+      return;
+    }
+    
+    // Attempt login
+    try {
+      const result = await login(formData);
+      if (!result.success) {
+        setFormError(result.error?.response?.data?.message || 'Login failed');
+      }
+    } catch (err) {
+      setFormError('An unexpected error occurred. Please try again.');
+      console.error('Login submission error:', err);
+    }
   };
   
   return (
     <div className="login-container">
       <h2>Welcome <span>Back</span></h2>
+      
+      {/* Show form errors */}
+      {(formError || error) && (
+        <div className="error-message">
+          {formError || error}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -62,10 +83,10 @@ function Login() {
         
         <button 
           type="submit" 
-          className={loginStatus === 'pending' ? 'loading' : ''}
-          disabled={loginStatus === 'pending'}
+          className={isLoading ? 'loading' : ''}
+          disabled={isLoading}
         >
-          {loginStatus === 'pending' ? 'Signing in...' : 'Sign In'}
+          {isLoading ? 'Signing in...' : 'Sign In'}
         </button>
       </form>
       

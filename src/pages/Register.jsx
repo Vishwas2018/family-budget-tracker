@@ -1,5 +1,4 @@
-import { Link, Navigate } from 'react-router-dom';
-
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 
@@ -8,47 +7,63 @@ import { useState } from 'react';
  * Handles new user registration
  */
 function Register() {
-  const { isAuthenticated, register: registerUser, registerStatus } = useAuth();
+  const { register, error, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
-  const [passwordError, setPasswordError] = useState('');
-  
-  // Redirect if already authenticated
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const [formError, setFormError] = useState('');
   
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear password error when user types in either password field
-    if (name === 'password' || name === 'confirmPassword') {
-      setPasswordError('');
-    }
+    // Clear error when user types
+    if (formError) setFormError('');
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setPasswordError('Passwords do not match');
+      setFormError('Passwords do not match');
+      return;
+    }
+    
+    // Validate password length
+    if (formData.password.length < 6) {
+      setFormError('Password must be at least 6 characters');
       return;
     }
     
     // Send registration data without confirmPassword
     const { confirmPassword, ...registrationData } = formData;
-    registerUser(registrationData);
+    
+    // Attempt registration
+    try {
+      const result = await register(registrationData);
+      if (!result.success) {
+        setFormError(result.error?.response?.data?.message || 'Registration failed');
+      }
+    } catch (err) {
+      setFormError('An unexpected error occurred. Please try again.');
+      console.error('Registration submission error:', err);
+    }
   };
   
   return (
     <div className="register-container">
       <h2>Create Your <span>Account</span></h2>
+      
+      {/* Show form errors */}
+      {(formError || error) && (
+        <div className="error-message">
+          {formError || error}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -103,15 +118,14 @@ function Register() {
             required
             minLength={6}
           />
-          {passwordError && <p className="error-text">{passwordError}</p>}
         </div>
         
         <button 
           type="submit" 
-          className={registerStatus === 'pending' ? 'loading' : ''}
-          disabled={registerStatus === 'pending'}
+          className={isLoading ? 'loading' : ''}
+          disabled={isLoading}
         >
-          {registerStatus === 'pending' ? 'Creating Account...' : 'Create Account'}
+          {isLoading ? 'Creating Account...' : 'Create Account'}
         </button>
       </form>
       

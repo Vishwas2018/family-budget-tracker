@@ -1,9 +1,7 @@
-import { createContext, useContext, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 import authService from '../api/authService';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../providers/AppProvider';
 
 // Create Auth context
 const AuthContext = createContext(null);
@@ -12,118 +10,106 @@ const AuthContext = createContext(null);
  * Authentication provider component that manages user authentication state
  */
 export function AuthProvider({ children }) {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { success, error: showError } = useNotifications();
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
 
-  // User data query - uses localStorage to restore immediate state,
-  // then validates via API
-  const { 
-    data: user,
-    error,
-    status
-  } = useQuery({
-    queryKey: ['auth', 'user'],
-    queryFn: async () => {
-      // Try to get stored user first
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) return null;
-      
-      try {
-        // Validate token with API
-        const isAuthenticated = await authService.checkAuth();
-        if (!isAuthenticated) {
-          throw new Error('Authentication failed');
-        }
-        
-        // Return stored user if valid
-        return JSON.parse(storedUser);
-      } catch (error) {
-        // Clear invalid credentials
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        throw error;
-      }
-    },
-    retry: false,
-  });
-
-  // Effect to handle authentication errors
+  // Initialize auth state from localStorage
   useEffect(() => {
-    if (error && status === 'error') {
-      showError('Authentication session expired. Please login again.');
+    const initializeAuth = async () => {
+      try {
+        // Get stored credentials
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        
+        if (storedUser && token) {
+          try {
+            // Verify token with backend
+            const isValid = await authService.checkAuth();
+            
+            if (isValid) {
+              // If token is valid, set the user
+              setUser(JSON.parse(storedUser));
+            } else {
+              // If token is invalid, clear storage
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              console.log('Token validation failed - user will need to login');
+            }
+          } catch (error) {
+            // Handle token verification error
+            console.error('Token validation error:', error);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+        } else {
+          // No stored credentials found
+          console.log('No stored credentials found - user needs to login');
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setAuthError(error.message);
+      } finally {
+        // Always turn off loading state to prevent app from hanging
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Login function
+  const login = async (credentials) => {
+    try {
+      setIsLoading(true);
+      const data = await authService.login(credentials);
+      
+      // Store token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Update auth state
+      setUser(data.user);
+      
+      // Redirect to dashboard
+      navigate('/dashboard');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      setAuthError(error.response?.data?.message || 'Login failed. Please check your credentials.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
     }
-  }, [error, status, showError]);
+  };
 
-  // Login mutation
-  const loginMutation = useMutation({
-    mutationFn: authService.login,
-    onSuccess: (data) => {
+  // Register function
+  const register = async (userData) => {
+    try {
+      setIsLoading(true);
+      const data = await authService.register(userData);
+      
       // Store token and user data
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
       // Update auth state
-      queryClient.setQueryData(['auth', 'user'], data.user);
-      
-      // Show success message
-      success('Login successful!');
+      setUser(data.user);
       
       // Redirect to dashboard
       navigate('/dashboard');
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || 'Login failed';
-      showError(message);
-    },
-  });
-
-  // Register mutation
-  const registerMutation = useMutation({
-    mutationFn: authService.register,
-    onSuccess: (data) => {
-      // Store token and user data
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Update auth state
-      queryClient.setQueryData(['auth', 'user'], data.user);
-      
-      // Show success message
-      success('Account created successfully!');
-      
-      // Redirect to dashboard
-      navigate('/dashboard');
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || 'Registration failed';
-      showError(message);
-    },
-  });
-
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: authService.updateProfile,
-    onSuccess: (data) => {
-      // Update stored user data
-      const updatedUser = { 
-        ...user, 
-        name: data.name,
-        email: data.email 
-      };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      
-      // Update auth state
-      queryClient.setQueryData(['auth', 'user'], updatedUser);
-      
-      // Show success message
-      success('Profile updated successfully!');
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || 'Profile update failed';
-      showError(message);
-    },
-  });
+      return { success: true };
+    } catch (error) {
+      console.error('Registration error:', error);
+      setAuthError(error.response?.data?.message || 'Registration failed. Please try again.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Logout function
   const logout = () => {
@@ -132,13 +118,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
     
     // Reset auth state
-    queryClient.setQueryData(['auth', 'user'], null);
-    
-    // Invalidate all queries to force refetch when logging in again
-    queryClient.invalidateQueries();
-    
-    // Show success message
-    success('Logged out successfully');
+    setUser(null);
     
     // Redirect to login
     navigate('/login');
@@ -148,15 +128,12 @@ export function AuthProvider({ children }) {
   const authValues = {
     user,
     isAuthenticated: !!user,
-    isLoading: status === 'loading',
+    isLoading,
     isAdmin: user?.role === 'admin',
-    login: loginMutation.mutate,
-    register: registerMutation.mutate,
-    updateProfile: updateProfileMutation.mutate,
-    logout,
-    loginStatus: loginMutation.status,
-    registerStatus: registerMutation.status,
-    updateProfileStatus: updateProfileMutation.status,
+    error: authError,
+    login,
+    register,
+    logout
   };
 
   return (

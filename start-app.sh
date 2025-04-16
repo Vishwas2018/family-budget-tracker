@@ -1,181 +1,153 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Budget Tracker App Launcher
-# This script starts both frontend and backend servers simultaneously
-# Author: Claude
+# Colors for terminal output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-set -e  # Exit immediately if a command exits with a non-zero status
+echo -e "${BLUE}======================================${NC}"
+echo -e "${GREEN}Family Budget Tracker Startup Script${NC}"
+echo -e "${BLUE}======================================${NC}"
 
-# Text formatting
-BOLD="\033[1m"
-GREEN="\033[0;32m"
-YELLOW="\033[0;33m"
-BLUE="\033[0;34m"
-RED="\033[0;31m"
-NC="\033[0m" # No Color
+# Create logs directory if it doesn't exist
+mkdir -p logs
 
-# Configuration variables
-BACKEND_PORT=5001
-FRONTEND_PORT=5173
-PROJECT_ROOT=$(pwd)
-BACKEND_DIR="${PROJECT_ROOT}/backend"
-LOGS_DIR="${PROJECT_ROOT}/logs"
-
-# Ensure log directory exists
-mkdir -p "$LOGS_DIR"
-
-log() {
-  echo -e "${BLUE}[$(date +"%H:%M:%S")]${NC} $1"
+# Function to check if port is in use
+is_port_in_use() {
+  if command -v lsof > /dev/null; then
+    lsof -i:"$1" > /dev/null
+    return $?
+  elif command -v netstat > /dev/null; then
+    netstat -tuln | grep ":$1 " > /dev/null
+    return $?
+  else
+    echo -e "${YELLOW}Warning: Cannot check port availability (missing lsof/netstat)${NC}"
+    return 1
+  fi
 }
 
-success() {
-  echo -e "${GREEN}$1${NC}"
-}
+# Check if MongoDB is running (simplified check)
+echo -e "\n${YELLOW}Checking for MongoDB...${NC}"
+if command -v mongod > /dev/null; then
+  echo -e "${GREEN}MongoDB is installed.${NC}"
+else
+  echo -e "${YELLOW}MongoDB command not found. This might be fine if you're using MongoDB Atlas or another remote connection.${NC}"
+fi
 
-warn() {
-  echo -e "${YELLOW}$1${NC}"
-}
+# Kill processes if needed
+if is_port_in_use 5001; then
+  echo -e "${YELLOW}Port 5001 is already in use. Attempting to free it...${NC}"
+  if command -v lsof > /dev/null; then
+    kill $(lsof -t -i:5001) 2>/dev/null || true
+    sleep 1
+  else
+    echo -e "${RED}Cannot free port 5001. Please check for running processes manually.${NC}"
+  fi
+fi
 
-error() {
-  echo -e "${RED}$1${NC}"
+if is_port_in_use 5173; then
+  echo -e "${YELLOW}Port 5173 is already in use. Attempting to free it...${NC}"
+  if command -v lsof > /dev/null; then
+    kill $(lsof -t -i:5173) 2>/dev/null || true
+    sleep 1
+  else
+    echo -e "${RED}Cannot free port 5173. Please check for running processes manually.${NC}"
+  fi
+fi
+
+# Start backend
+echo -e "\n${YELLOW}Starting backend server...${NC}"
+cd backend
+npm install > ../logs/backend-install.log 2>&1 || {
+  echo -e "${RED}Failed to install backend dependencies. Check logs/backend-install.log${NC}"
   exit 1
 }
 
-# Function to check if a port is in use
-is_port_in_use() {
-  lsof -i :"$1" &>/dev/null
+if [ -f "server.js" ]; then
+  node server.js > ../logs/backend.log 2>&1 &
+  BACKEND_PID=$!
+  echo -e "${GREEN}Backend started with PID: ${BACKEND_PID}${NC}"
+else
+  echo -e "${RED}server.js not found in backend directory!${NC}"
+  exit 1
+fi
+cd ..
+
+# Wait for backend to start
+echo -e "${YELLOW}Waiting for backend to initialize (5 seconds)...${NC}"
+sleep 5
+
+# Check if backend is still running
+if kill -0 $BACKEND_PID 2>/dev/null; then
+  echo -e "${GREEN}Backend is running.${NC}"
+else
+  echo -e "${RED}Backend failed to start. Check logs/backend.log for details.${NC}"
+  echo -e "${YELLOW}Last 10 lines of the backend log:${NC}"
+  tail -n 10 logs/backend.log
+  exit 1
+fi
+
+# Install frontend dependencies
+echo -e "\n${YELLOW}Installing frontend dependencies...${NC}"
+npm install > logs/frontend-install.log 2>&1 || {
+  echo -e "${RED}Failed to install frontend dependencies. Check logs/frontend-install.log${NC}"
+  kill $BACKEND_PID
+  exit 1
 }
 
-# Function to kill process running on a specific port
-kill_process_on_port() {
-  local port=$1
-  local pid
-  
-  if is_port_in_use "$port"; then
-    pid=$(lsof -t -i:"$port")
-    log "Port $port is in use by process $pid. Attempting to kill..."
-    
-    if kill -15 "$pid" 2>/dev/null; then
-      sleep 1
-      success "Process $pid terminated gracefully."
-    else
-      warn "Could not terminate process gracefully. Trying force kill..."
-      kill -9 "$pid" 2>/dev/null || error "Failed to kill process on port $port"
-      success "Process $pid forcefully terminated."
-    fi
-  else
-    log "Port $port is available. No need to kill any process."
-  fi
-}
+# Start frontend
+echo -e "\n${YELLOW}Starting frontend development server...${NC}"
+npm run dev > logs/frontend.log 2>&1 &
+FRONTEND_PID=$!
+echo -e "${GREEN}Frontend started with PID: ${FRONTEND_PID}${NC}"
 
-# Function to start the backend server
-start_backend() {
-  log "Starting backend server on port ${BACKEND_PORT}..."
-  
-  # Check if backend directory exists
-  if [ ! -d "$BACKEND_DIR" ]; then
-    error "Backend directory not found at $BACKEND_DIR"
-  fi
-  
-  # Check for backend package.json
-  if [ ! -f "$BACKEND_DIR/package.json" ]; then
-    error "No package.json found in backend directory"
-  fi
-  
-  # Kill any process running on the backend port
-  kill_process_on_port "$BACKEND_PORT"
-  
-  # Set backend to use custom port
-  export PORT="$BACKEND_PORT"
-  
-  # Start the backend
-  cd "$BACKEND_DIR" || error "Failed to change to backend directory"
-  
-  if [ -f "server.js" ]; then
-    node server.js > "$LOGS_DIR/backend.log" 2>&1 &
-    local backend_pid=$!
-    success "Backend server started with PID $backend_pid"
-    
-    # Check if backend started successfully
-    sleep 2
-    if ! is_port_in_use "$BACKEND_PORT"; then
-      warn "Backend may have failed to start. Check logs at $LOGS_DIR/backend.log"
-    fi
-  else
-    error "server.js not found in backend directory"
-  fi
-  
-  cd "$PROJECT_ROOT" || error "Failed to return to project root"
-}
+# Wait for frontend to start
+echo -e "${YELLOW}Waiting for frontend to initialize (5 seconds)...${NC}"
+sleep 5
 
-# Function to start the frontend server
-start_frontend() {
-  log "Starting frontend development server..."
-  
-  # Kill any process on frontend port if needed
-  kill_process_on_port "$FRONTEND_PORT"
-  
-  # Start the frontend
-  npm run dev > "$LOGS_DIR/frontend.log" 2>&1 &
-  local frontend_pid=$!
-  success "Frontend server started with PID $frontend_pid"
-  
-  # Check if frontend started successfully
-  sleep 3
-  if ! is_port_in_use "$FRONTEND_PORT"; then
-    warn "Frontend may have failed to start. Check logs at $LOGS_DIR/frontend.log"
-  fi
-}
+# Check if frontend is still running
+if kill -0 $FRONTEND_PID 2>/dev/null; then
+  echo -e "${GREEN}Frontend is running.${NC}"
+else
+  echo -e "${RED}Frontend failed to start. Check logs/frontend.log for details.${NC}"
+  echo -e "${YELLOW}Last 10 lines of the frontend log:${NC}"
+  tail -n 10 logs/frontend.log
+  kill $BACKEND_PID
+  exit 1
+fi
 
-# Main function
-main() {
-  echo -e "${BOLD}=== Budget Tracker App Launcher ===${NC}"
-  
-  log "Setting up environment..."
-  
-  # Ensure the script is run from the project root
-  if [ ! -f "package.json" ]; then
-    error "This script must be run from the project root directory"
-  fi
-  
-  # Start backend
-  start_backend
-  
-  # Start frontend
-  start_frontend
-  
-  # Summary
-  log "Application startup complete."
-  echo -e "${BOLD}URLs:${NC}"
-  echo -e "  ${GREEN}Backend:${NC} http://localhost:${BACKEND_PORT}"
-  echo -e "  ${GREEN}Frontend:${NC} http://localhost:${FRONTEND_PORT}"
-  echo -e "${BOLD}Logs:${NC}"
-  echo -e "  ${BLUE}Backend:${NC} $LOGS_DIR/backend.log"
-  echo -e "  ${BLUE}Frontend:${NC} $LOGS_DIR/frontend.log"
-  
-  # Monitor logs
-  echo ""
-  echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
-  echo -e "${BOLD}Showing live logs:${NC}"
-  
-  # Use tail to show both logs simultaneously
-  tail -f "$LOGS_DIR/backend.log" "$LOGS_DIR/frontend.log"
-}
+# Success message
+echo -e "\n${GREEN}==============================================================================${NC}"
+echo -e "${GREEN}All services started successfully!${NC}"
+echo -e "${YELLOW}Backend API:${NC} http://localhost:5001"
+echo -e "${YELLOW}Frontend:${NC} http://localhost:5173"
+echo -e "${YELLOW}Log files:${NC}"
+echo -e "  - ${BLUE}Backend:${NC} $(pwd)/logs/backend.log"
+echo -e "  - ${BLUE}Frontend:${NC} $(pwd)/logs/frontend.log"
+echo -e "${GREEN}==============================================================================${NC}"
 
-# Cleanup function
+# Function to clean up on exit
 cleanup() {
-  echo ""
-  log "Shutting down servers..."
-  
-  kill_process_on_port "$BACKEND_PORT"
-  kill_process_on_port "$FRONTEND_PORT"
-  
-  success "All servers stopped. Have a nice day!"
+  echo -e "\n${YELLOW}Shutting down services...${NC}"
+  kill $FRONTEND_PID 2>/dev/null || true
+  kill $BACKEND_PID 2>/dev/null || true
+  echo -e "${GREEN}All services stopped.${NC}"
   exit 0
 }
 
-# Set up trap to handle script termination
-trap cleanup SIGINT SIGTERM
+# Set up trap for clean shutdown
+trap cleanup INT TERM
 
-# Run the main function
-main
+echo -e "\n${YELLOW}Monitoring logs. Press Ctrl+C to stop all services.${NC}"
+echo -e "${BLUE}------ Backend Log ------${NC}"
+tail -f logs/backend.log | sed 's/^/[Backend] /' &
+BACKEND_TAIL_PID=$!
+
+echo -e "${BLUE}\n------ Frontend Log ------${NC}"
+tail -f logs/frontend.log | sed 's/^/[Frontend] /' &
+FRONTEND_TAIL_PID=$!
+
+# Wait for Ctrl+C
+wait $BACKEND_TAIL_PID $FRONTEND_TAIL_PID
