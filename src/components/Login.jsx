@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 
 import axios from 'axios';
+import { useAuth } from '../App';
 import { useState } from 'react';
 
-function Login({ onLoginSuccess }) {
+function Login() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -11,6 +12,7 @@ function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -25,19 +27,14 @@ function Login({ onLoginSuccess }) {
     setError('');
     
     try {
-      // Use API endpoint with full URL during development
       const response = await axios.post('/api/users/login', formData, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
       
-      // Store authentication data
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      
-      // Update authentication state
-      if (onLoginSuccess) onLoginSuccess();
+      // Use auth context login function
+      login(response.data.user, response.data.token);
       
       // Redirect to dashboard
       navigate('/dashboard');

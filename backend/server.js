@@ -14,7 +14,24 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // Vite dev server default port
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:4173', // Vite preview
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:4173',
+      // Add your production origin when deployed
+    ];
+    
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
@@ -28,7 +45,7 @@ app.use((req, res, next) => {
 
 // Connect to MongoDB
 mongoose
-  .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/family-budget-tracker')
+  .connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('MongoDB connection error:', err));
 

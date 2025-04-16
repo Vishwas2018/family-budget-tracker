@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 
 import axios from 'axios';
+import { useAuth } from '../App';
 import { useState } from 'react';
 
-function Register({ onRegisterSuccess }) {
+function Register() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -13,6 +14,7 @@ function Register({ onRegisterSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -40,19 +42,14 @@ function Register({ onRegisterSuccess }) {
         password: formData.password
       };
       
-      // Use API endpoint with full URL during development
       const response = await axios.post('/api/users/register', registerData, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
       
-      // Store authentication data
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      
-      // Update authentication state
-      if (onRegisterSuccess) onRegisterSuccess();
+      // Use auth context login function
+      login(response.data.user, response.data.token);
       
       // Redirect to dashboard
       navigate('/dashboard');
