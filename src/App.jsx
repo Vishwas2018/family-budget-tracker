@@ -4,13 +4,16 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import EditTransaction from './pages/EditTransaction';
 import Login from './pages/Login';
 import Navigation from './components/layout/Navigation';
+import NewTransaction from './pages/NewTransaction';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Register from './pages/Register';
+import Transactions from './pages/Transactions';
 // Hooks and Context
 import { useAuth } from './contexts/AuthContext';
 import { useEffect } from 'react';
@@ -22,14 +25,16 @@ function App() {
   const { isLoading, isAuthenticated, user } = useAuth();
   const location = useLocation();
 
-  // Log authentication state for debugging
+  // Log authentication state for debugging in development
   useEffect(() => {
-    console.log('Auth state:', { 
-      isLoading, 
-      isAuthenticated,
-      hasUser: !!user,
-      currentPath: location.pathname
-    });
+    if (import.meta.env.DEV) {
+      console.log('Auth state:', { 
+        isLoading, 
+        isAuthenticated,
+        hasUser: !!user,
+        currentPath: location.pathname
+      });
+    }
   }, [isLoading, isAuthenticated, user, location.pathname]);
 
   // Show loading indicator while authentication is being determined
@@ -72,6 +77,25 @@ function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          
+          {/* Transaction routes */}
+          <Route path="/dashboard/transactions" element={
+            <ProtectedRoute>
+              <Transactions />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/transactions/new" element={
+            <ProtectedRoute>
+              <NewTransaction />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/transactions/:id/edit" element={
+            <ProtectedRoute>
+              <EditTransaction />
             </ProtectedRoute>
           } />
           

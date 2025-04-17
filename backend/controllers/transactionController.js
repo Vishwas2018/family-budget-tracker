@@ -1,5 +1,6 @@
 const Transaction = require('../models/Transaction');
 const { ApiError } = require('../middleware/errorMiddleware');
+const apiResponse = require('../utils/apiResponse');
 
 /**
  * Get all transactions for the logged-in user
@@ -47,7 +48,7 @@ const getTransactions = async (req, res, next) => {
     // Get total count for pagination info
     const total = await Transaction.countDocuments(filter);
     
-    res.json({
+    return apiResponse.success(res, 200, 'Transactions retrieved successfully', {
       transactions,
       pagination: {
         total,
@@ -70,15 +71,15 @@ const getTransactionById = async (req, res, next) => {
     const transaction = await Transaction.findById(req.params.id);
     
     if (!transaction) {
-      throw new ApiError('Transaction not found', 404);
+      return apiResponse.notFound(res, 'Transaction not found');
     }
     
     // Check if transaction belongs to the logged-in user
     if (transaction.user.toString() !== req.user._id.toString()) {
-      throw new ApiError('Not authorized to access this transaction', 403);
+      return apiResponse.forbidden(res, 'Not authorized to access this transaction');
     }
     
-    res.json(transaction);
+    return apiResponse.success(res, 200, 'Transaction retrieved successfully', transaction);
   } catch (error) {
     next(error);
   }
@@ -95,17 +96,17 @@ const createTransaction = async (req, res, next) => {
     
     // Validate required fields
     if (!type || !amount || !category || !date) {
-      throw new ApiError('Please provide all required fields', 400);
+      return apiResponse.badRequest(res, 'Please provide all required fields');
     }
     
     // Validate transaction type
     if (!['income', 'expense'].includes(type)) {
-      throw new ApiError('Transaction type must be either income or expense', 400);
+      return apiResponse.badRequest(res, 'Transaction type must be either income or expense');
     }
     
     // Validate amount is positive
     if (amount <= 0) {
-      throw new ApiError('Amount must be greater than 0', 400);
+      return apiResponse.badRequest(res, 'Amount must be greater than 0');
     }
     
     // Create transaction
@@ -120,7 +121,7 @@ const createTransaction = async (req, res, next) => {
       recurringInterval: recurringInterval || null
     });
     
-    res.status(201).json(transaction);
+    return apiResponse.created(res, 'Transaction created successfully', transaction);
   } catch (error) {
     next(error);
   }
@@ -136,12 +137,12 @@ const updateTransaction = async (req, res, next) => {
     const transaction = await Transaction.findById(req.params.id);
     
     if (!transaction) {
-      throw new ApiError('Transaction not found', 404);
+      return apiResponse.notFound(res, 'Transaction not found');
     }
     
     // Check if transaction belongs to the logged-in user
     if (transaction.user.toString() !== req.user._id.toString()) {
-      throw new ApiError('Not authorized to update this transaction', 403);
+      return apiResponse.forbidden(res, 'Not authorized to update this transaction');
     }
     
     // Update fields if provided
@@ -150,15 +151,15 @@ const updateTransaction = async (req, res, next) => {
     if (type) {
       // Validate transaction type
       if (!['income', 'expense'].includes(type)) {
-        throw new ApiError('Transaction type must be either income or expense', 400);
+        return apiResponse.badRequest(res, 'Transaction type must be either income or expense');
       }
       transaction.type = type;
     }
     
-    if (amount) {
+    if (amount !== undefined) {
       // Validate amount is positive
       if (amount <= 0) {
-        throw new ApiError('Amount must be greater than 0', 400);
+        return apiResponse.badRequest(res, 'Amount must be greater than 0');
       }
       transaction.amount = amount;
     }
@@ -171,7 +172,7 @@ const updateTransaction = async (req, res, next) => {
     
     const updatedTransaction = await transaction.save();
     
-    res.json(updatedTransaction);
+    return apiResponse.success(res, 200, 'Transaction updated successfully', updatedTransaction);
   } catch (error) {
     next(error);
   }
@@ -187,17 +188,17 @@ const deleteTransaction = async (req, res, next) => {
     const transaction = await Transaction.findById(req.params.id);
     
     if (!transaction) {
-      throw new ApiError('Transaction not found', 404);
+      return apiResponse.notFound(res, 'Transaction not found');
     }
     
     // Check if transaction belongs to the logged-in user
     if (transaction.user.toString() !== req.user._id.toString()) {
-      throw new ApiError('Not authorized to delete this transaction', 403);
+      return apiResponse.forbidden(res, 'Not authorized to delete this transaction');
     }
     
     await transaction.deleteOne();
     
-    res.json({ message: 'Transaction removed' });
+    return apiResponse.success(res, 200, 'Transaction deleted successfully');
   } catch (error) {
     next(error);
   }
@@ -255,7 +256,7 @@ const getTransactionSummary = async (req, res, next) => {
     // Calculate balance
     summaryData.balance = summaryData.income - summaryData.expenses;
     
-    res.json(summaryData);
+    return apiResponse.success(res, 200, 'Transaction summary retrieved successfully', summaryData);
   } catch (error) {
     next(error);
   }
@@ -326,7 +327,7 @@ const getMonthlyTransactions = async (req, res, next) => {
       result[monthIndex].balance = result[monthIndex].income - result[monthIndex].expenses;
     });
     
-    res.json(result);
+    return apiResponse.success(res, 200, 'Monthly transactions retrieved successfully', result);
   } catch (error) {
     next(error);
   }
@@ -386,7 +387,7 @@ const getCategoryBreakdown = async (req, res, next) => {
       percentage: total > 0 ? (category.amount / total) * 100 : 0
     }));
     
-    res.json({
+    return apiResponse.success(res, 200, 'Category breakdown retrieved successfully', {
       breakdown: formattedData,
       total
     });
