@@ -33,20 +33,23 @@ export default defineConfig(({ command, mode }) => {
         port: 5173,
         open: true, // Automatically open browser
         proxy: {
+          // Important: This is the correct proxy configuration for the API
           '/api': {
             target: 'http://localhost:5001',
-            changeOrigin: true, 
+            changeOrigin: true,
             secure: false,
             ws: true, // Support WebSocket
+            // Don't rewrite paths - keep the /api prefix
+            // rewrite: (path) => path.replace(/^\/api/, ''),
             configure: (proxy, _options) => {
               proxy.on('error', (err, _req, _res) => {
-                console.log('proxy error', err);
+                console.log('Proxy error:', err);
               });
               proxy.on('proxyReq', (proxyReq, req, _res) => {
-                console.log('Sending Request:', req.method, req.url);
+                console.log('Sending Request to API:', req.method, req.url);
               });
               proxy.on('proxyRes', (proxyRes, req, _res) => {
-                console.log('Received Response from:', req.url, proxyRes.statusCode);
+                console.log('Received Response from API:', req.url, proxyRes.statusCode);
               });
             },
           }

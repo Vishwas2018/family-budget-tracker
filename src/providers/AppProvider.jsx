@@ -62,7 +62,6 @@ export function useNotifications() {
 
 /**
  * Root application provider that composes all providers in the correct order
- * This version doesn't require external dependencies like react-hot-toast
  */
 function AppProvider({ children }) {
   return (

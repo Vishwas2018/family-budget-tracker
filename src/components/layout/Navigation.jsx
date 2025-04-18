@@ -3,8 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
- * Main navigation component
- * Provides navigation links and user options
+ * Main navigation component with enhanced links for income and expenses
  */
 function Navigation() {
   const { user, logout } = useAuth();
@@ -42,7 +41,30 @@ function Navigation() {
               >
                 Transactions
               </NavLink>
-              {/* Future links like Reports, Budget, etc. can be added here */}
+              <NavLink 
+                to="/dashboard/income" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Income
+              </NavLink>
+              <NavLink 
+                to="/dashboard/expenses" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Expenses
+              </NavLink>
+              <NavLink 
+                to="/dashboard/bills" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Bills
+              </NavLink>
+              <NavLink 
+                to="/dashboard/reports" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Reports
+              </NavLink>
             </div>
             
             <div className="nav-user">

@@ -2,9 +2,11 @@ import './App.css';
 
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
+import BillsAndReminders from './pages/BillsAndReminders';
 // Pages
 import Dashboard from './pages/Dashboard';
 import EditTransaction from './pages/EditTransaction';
+import IncomeExpenses from './pages/IncomeExpenses';
 import Login from './pages/Login';
 import Navigation from './components/layout/Navigation';
 import NewTransaction from './pages/NewTransaction';
@@ -13,6 +15,7 @@ import Profile from './pages/Profile';
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Register from './pages/Register';
+import Reports from './pages/Reports';
 import Transactions from './pages/Transactions';
 // Hooks and Context
 import { useAuth } from './contexts/AuthContext';
@@ -96,6 +99,33 @@ function App() {
           <Route path="/dashboard/transactions/:id/edit" element={
             <ProtectedRoute>
               <EditTransaction />
+            </ProtectedRoute>
+          } />
+          
+          {/* Income and Expenses routes */}
+          <Route path="/dashboard/income" element={
+            <ProtectedRoute>
+              <IncomeExpenses />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dashboard/expenses" element={
+            <ProtectedRoute>
+              <IncomeExpenses />
+            </ProtectedRoute>
+          } />
+          
+          {/* Bills and Reminders routes */}
+          <Route path="/dashboard/bills" element={
+            <ProtectedRoute>
+              <BillsAndReminders />
+            </ProtectedRoute>
+          } />
+          
+          {/* Reports routes */}
+          <Route path="/dashboard/reports" element={
+            <ProtectedRoute>
+              <Reports />
             </ProtectedRoute>
           } />
           

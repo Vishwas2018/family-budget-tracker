@@ -13,10 +13,10 @@ const authService = {
     try {
       console.log('Registering user:', userData.email);
       const response = await apiClient.post('/users/register', userData);
-      console.log('Registration successful');
+      console.log('Registration successful', response.data);
       return response.data;
     } catch (error) {
-      console.error('Registration error:', error.response?.data || error.message);
+      console.error('Registration error:', error?.response?.data || error.message);
       throw error;
     }
   },
@@ -30,10 +30,10 @@ const authService = {
     try {
       console.log('Logging in user:', credentials.email);
       const response = await apiClient.post('/users/login', credentials);
-      console.log('Login successful');
+      console.log('Login successful', response.data);
       return response.data;
     } catch (error) {
-      console.error('Login error:', error.response?.data || error.message);
+      console.error('Login error:', error?.response?.data || error.message);
       throw error;
     }
   },
@@ -47,7 +47,7 @@ const authService = {
       const response = await apiClient.get('/users/profile');
       return response.data;
     } catch (error) {
-      console.error('Get profile error:', error.response?.data || error.message);
+      console.error('Get profile error:', error?.response?.data || error.message);
       throw error;
     }
   },
@@ -62,7 +62,7 @@ const authService = {
       const response = await apiClient.put('/users/profile', profileData);
       return response.data;
     } catch (error) {
-      console.error('Update profile error:', error.response?.data || error.message);
+      console.error('Update profile error:', error?.response?.data || error.message);
       throw error;
     }
   },
@@ -74,8 +74,8 @@ const authService = {
   checkAuth: async () => {
     try {
       console.log('Checking auth status');
-      await apiClient.get('/users/profile');
-      console.log('Auth check: User is authenticated');
+      const response = await apiClient.get('/users/profile');
+      console.log('Auth check: User is authenticated', response.data);
       return true;
     } catch (error) {
       console.log('Auth check: User is not authenticated', error.message);

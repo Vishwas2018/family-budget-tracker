@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
             if (isValid) {
               // If token is valid, set the user
               setUser(JSON.parse(storedUser));
+              console.log('Successfully authenticated with stored token');
             } else {
               // If token is invalid, clear storage
               localStorage.removeItem('token');
@@ -63,7 +64,13 @@ export function AuthProvider({ children }) {
   const login = async (credentials) => {
     try {
       setIsLoading(true);
+      setAuthError(null); // Clear previous errors
+      
       const data = await authService.login(credentials);
+      
+      if (!data || !data.token || !data.user) {
+        throw new Error('Invalid response from server');
+      }
       
       // Store token and user data
       localStorage.setItem('token', data.token);
@@ -72,14 +79,20 @@ export function AuthProvider({ children }) {
       // Update auth state
       setUser(data.user);
       
+      console.log('Login successful:', data.user.email);
+      
       // Redirect to dashboard
       navigate('/dashboard');
       
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      setAuthError(error.response?.data?.message || 'Login failed. Please check your credentials.');
-      return { success: false, error };
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Login failed. Please check your credentials.';
+      
+      setAuthError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +102,13 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     try {
       setIsLoading(true);
+      setAuthError(null); // Clear previous errors
+      
       const data = await authService.register(userData);
+      
+      if (!data || !data.token || !data.user) {
+        throw new Error('Invalid response from server');
+      }
       
       // Store token and user data
       localStorage.setItem('token', data.token);
@@ -98,14 +117,20 @@ export function AuthProvider({ children }) {
       // Update auth state
       setUser(data.user);
       
+      console.log('Registration successful:', data.user.email);
+      
       // Redirect to dashboard
       navigate('/dashboard');
       
       return { success: true };
     } catch (error) {
       console.error('Registration error:', error);
-      setAuthError(error.response?.data?.message || 'Registration failed. Please try again.');
-      return { success: false, error };
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Registration failed. Please try again.';
+      
+      setAuthError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +144,9 @@ export function AuthProvider({ children }) {
     
     // Reset auth state
     setUser(null);
+    setAuthError(null);
+    
+    console.log('User logged out');
     
     // Redirect to login
     navigate('/login');

@@ -75,7 +75,7 @@ if (config.env === 'development') {
   app.use(morgan('dev'));
 }
 
-// API Routes
+// API Routes - FIX: Use proper API routes configuration
 app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -101,6 +101,10 @@ if (config.env === 'production') {
   });
 }
 
+// Error handling middleware
+app.use(notFound);
+app.use(errorHandler);
+
 // Connect to MongoDB with enhanced options
 const connectDB = async () => {
   try {
@@ -123,10 +127,6 @@ const connectDB = async () => {
     process.exit(1); // Exit on failure
   }
 };
-
-// Error handling middleware
-app.use(notFound);
-app.use(errorHandler);
 
 // Connect to database before starting server
 connectDB().then(() => {

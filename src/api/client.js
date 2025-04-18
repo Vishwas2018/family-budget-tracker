@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create API client with defaults
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: '/api', // This will work with the correct proxy setup
   headers: {
     'Content-Type': 'application/json',
   },
