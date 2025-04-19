@@ -1,58 +1,32 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+
+import { useReminders } from '../contexts/RemindersContext';
 import { useState } from 'react';
 
 /**
  * Bills and Reminders page
  */
 function BillsAndReminders() {
-  // Placeholder data for reminders - in a real app, this would come from an API or context
-  const [reminders, setReminders] = useState([
-    {
-      id: 'r1',
-      title: 'Rent Payment',
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 5)),
-      amount: 1200,
-      category: 'Housing',
-      isPaid: false,
-      isOverdue: false
-    },
-    {
-      id: 'r2',
-      title: 'Electricity Bill',
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 2)),
-      amount: 85.50,
-      category: 'Utilities',
-      isPaid: false,
-      isOverdue: true
-    },
-    {
-      id: 'r3',
-      title: 'Netflix Subscription',
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 15)),
-      amount: 14.99,
-      category: 'Entertainment',
-      isPaid: false,
-      isOverdue: false
-    },
-    {
-      id: 'r4',
-      title: 'Car Insurance',
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 5)),
-      amount: 115,
-      category: 'Insurance',
-      isPaid: true,
-      isOverdue: false
-    },
-    {
-      id: 'r5',
-      title: 'Phone Bill',
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 10)),
-      amount: 49.99,
-      category: 'Utilities',
-      isPaid: false,
-      isOverdue: false
-    }
-  ]);
+  const location = useLocation();
+  
+  const { 
+    reminders,
+    upcomingReminders, 
+    overdueReminders, 
+    paidReminders, 
+    markAsPaid,
+    addReminder,
+    deleteReminder
+  } = useReminders();
+  
+  // Initialize form visibility from navigation state or default to hidden
+  const [showAddForm, setShowAddForm] = useState(location.state?.showAddForm === true);
+  const [newReminder, setNewReminder] = useState({
+    title: '',
+    dueDate: new Date().toISOString().split('T')[0],
+    amount: '',
+    category: ''
+  });
 
   // Format currency amounts
   const formatCurrency = (amount) => {
@@ -60,29 +34,123 @@ function BillsAndReminders() {
       style: 'currency', 
       currency: 'USD',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(amount || 0);
   };
 
-  // Handle marking a reminder as paid
-  const handleMarkAsPaid = (id) => {
-    setReminders(prevReminders => 
-      prevReminders.map(reminder => 
-        reminder.id === id ? { ...reminder, isPaid: true } : reminder
-      )
-    );
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewReminder({
+      ...newReminder,
+      [name]: name === 'amount' ? parseFloat(value) || 0 : value
+    });
   };
 
-  // Group reminders by status for better organization
-  const overdueReminders = reminders.filter(r => !r.isPaid && r.isOverdue);
-  const upcomingReminders = reminders.filter(r => !r.isPaid && !r.isOverdue);
-  const paidReminders = reminders.filter(r => r.isPaid);
+  // Handle form submission
+  const handleAddReminder = (e) => {
+    e.preventDefault();
+    if (!newReminder.title || !newReminder.dueDate || !newReminder.amount) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    addReminder({
+      ...newReminder,
+      dueDate: new Date(newReminder.dueDate)
+    });
+
+    // Reset form
+    setNewReminder({
+      title: '',
+      dueDate: new Date().toISOString().split('T')[0],
+      amount: '',
+      category: ''
+    });
+    setShowAddForm(false);
+  };
 
   return (
     <div className="bills-page">
       <header className="page-header">
         <h1>Bills & Reminders</h1>
-        <button className="btn btn-primary">Add New Reminder</button>
+        <button 
+          className="btn btn-primary"
+          onClick={() => setShowAddForm(!showAddForm)}
+        >
+          {showAddForm ? 'Cancel' : 'Add New Reminder'}
+        </button>
       </header>
+
+      {/* Add Reminder Form */}
+      {showAddForm && (
+        <div className="add-item-form">
+          <h2>Add New Reminder</h2>
+          <form onSubmit={handleAddReminder}>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="title">Title*</label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={newReminder.title}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Rent Payment"
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="category">Category*</label>
+                <input
+                  type="text"
+                  id="category"
+                  name="category"
+                  value={newReminder.category}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Housing"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="dueDate">Due Date*</label>
+                <input
+                  type="date"
+                  id="dueDate"
+                  name="dueDate"
+                  value={newReminder.dueDate}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="amount">Amount*</label>
+                <input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  value={newReminder.amount}
+                  onChange={handleInputChange}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0.01"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary">
+                Add Reminder
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="bills-container">
         {/* Overdue Bills */}
@@ -112,9 +180,15 @@ function BillsAndReminders() {
                   <div className="reminder-actions">
                     <button 
                       className="btn-sm btn-primary"
-                      onClick={() => handleMarkAsPaid(reminder.id)}
+                      onClick={() => markAsPaid(reminder.id)}
                     >
                       Mark as Paid
+                    </button>
+                    <button 
+                      className="btn-sm btn-secondary"
+                      onClick={() => deleteReminder(reminder.id)}
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -161,9 +235,15 @@ function BillsAndReminders() {
                     <div className="reminder-actions">
                       <button 
                         className="btn-sm btn-primary"
-                        onClick={() => handleMarkAsPaid(reminder.id)}
+                        onClick={() => markAsPaid(reminder.id)}
                       >
                         Mark as Paid
+                      </button>
+                      <button 
+                        className="btn-sm btn-secondary"
+                        onClick={() => deleteReminder(reminder.id)}
+                      >
+                        Delete
                       </button>
                     </div>
                   </div>
@@ -172,7 +252,7 @@ function BillsAndReminders() {
             ) : (
               <div className="empty-state">
                 <p>No upcoming bills or reminders.</p>
-                <button className="btn btn-sm btn-primary">
+                <button className="btn btn-sm btn-primary" onClick={() => setShowAddForm(true)}>
                   Add your first reminder
                 </button>
               </div>
@@ -202,6 +282,15 @@ function BillsAndReminders() {
                     <div className="reminder-amount">
                       {formatCurrency(reminder.amount)}
                     </div>
+                  </div>
+                  
+                  <div className="reminder-actions">
+                    <button 
+                      className="btn-sm btn-secondary"
+                      onClick={() => deleteReminder(reminder.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}

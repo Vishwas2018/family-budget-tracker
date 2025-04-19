@@ -57,7 +57,7 @@ function Navigation() {
                 to="/dashboard/bills" 
                 className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
               >
-                Bills
+                Bills & Reminders
               </NavLink>
               <NavLink 
                 to="/dashboard/reports" 

@@ -1,24 +1,39 @@
 import axios from 'axios';
 
-// Create API client with defaults
+// Create an axios instance with enhanced configuration
 const apiClient = axios.create({
-  baseURL: '/api', // This will work with the correct proxy setup
+  baseURL: '/api', // Works with the fixed Vite proxy configuration
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 15000, // 15 second timeout - increased for reliability
 });
 
-// Request interceptor for adding auth token
+// Track network status and retry count
+let isOnline = true;
+const retryQueue = [];
+const MAX_RETRY_ATTEMPTS = 3;
+
+// Request interceptor with enhanced error handling
 apiClient.interceptors.request.use(
   (config) => {
-    // Add debugging information
-    console.log(`Making ${config.method.toUpperCase()} request to ${config.url}`);
-    
-    // Add token if available
+    // Add token from localStorage if available
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Add retry configuration if not present
+    if (config.retry === undefined) {
+      config.retry = MAX_RETRY_ATTEMPTS;
+      config.retryCount = 0;
+      config.retryDelay = 1000; // Start with 1 second delay
+    }
+    
+    // Enhanced debugging for development only
+    if (import.meta.env.DEV) {
+      console.log(`[API] ${config.method.toUpperCase()} ${config.url}`, 
+        config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : '');
     }
     
     return config;
@@ -29,52 +44,135 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling common errors
+// Response interceptor with retry logic and token handling
 apiClient.interceptors.response.use(
   (response) => {
-    // Log successful responses for debugging
-    console.log(`Response from ${response.config.url}:`, response.status);
-    return response;
-  },
-  (error) => {
-    // Detailed error logging for debugging
-    if (error.response) {
-      // Server responded with an error status
-      console.error(`API Error (${error.response.status}):`, error.response.data);
-    } else if (error.request) {
-      // Request was made but no response received
-      console.error('Network Error - No response received:', error.request);
-    } else {
-      // Error in setting up the request
-      console.error('Request Error:', error.message);
+    // Reset retry count on successful requests
+    if (response.config.retryCount > 0) {
+      console.log(`Request to ${response.config.url} succeeded after ${response.config.retryCount} retries`);
     }
     
-    // Handle session expiration
+    // Update online status
+    if (!isOnline) {
+      isOnline = true;
+      console.log('Network connection restored');
+      // Process queued requests
+      processRetryQueue();
+    }
+    
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle network errors and implement retry logic
+    if (error.message === 'Network Error' || !error.response) {
+      if (isOnline) {
+        isOnline = false;
+        console.log('Network connection lost');
+      }
+      
+      // Add to retry queue if not already retrying
+      if (!originalRequest.isRetrying && originalRequest.retry > 0) {
+        originalRequest.isRetrying = true;
+        retryQueue.push(originalRequest);
+      }
+      
+      return Promise.reject(error);
+    }
+    
+    // Retry server errors (5xx) automatically
+    if (error.response && error.response.status >= 500 && originalRequest.retryCount < originalRequest.retry) {
+      originalRequest.retryCount++;
+      
+      // Exponential backoff
+      const delay = originalRequest.retryDelay * (2 ** (originalRequest.retryCount - 1));
+      console.log(`Retrying request to ${originalRequest.url} (attempt ${originalRequest.retryCount}/${originalRequest.retry}) after ${delay}ms`);
+      
+      return new Promise(resolve => {
+        setTimeout(() => resolve(apiClient(originalRequest)), delay);
+      });
+    }
+    
+    // Handle authentication errors
     if (error.response?.status === 401) {
       // Clear stored credentials on authentication failure
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        console.log('Redirecting to login due to authentication error');
-        window.location.href = '/login';
+      if (error.response.data?.message === 'Token expired' || 
+          error.response.data?.message === 'Invalid token') {
+        console.log('Authentication token expired or invalid. Logging out...');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
+    }
+    
+    // Enhanced error logging with response details
+    if (error.response) {
+      console.error(
+        `API Error (${error.response.status}): ${error.response.data?.message || 'Unknown error'}`,
+        error.response.data
+      );
+    } else if (error.request) {
+      console.error('No response received from API:', error.request);
+    } else {
+      console.error('API Request Error:', error.message);
     }
     
     return Promise.reject(error);
   }
 );
 
-// Test method to check if API is reachable
-apiClient.checkConnection = async () => {
+// Process the retry queue when back online
+function processRetryQueue() {
+  if (retryQueue.length === 0) return;
+  
+  console.log(`Processing ${retryQueue.length} queued requests`);
+  
+  retryQueue.forEach(request => {
+    console.log(`Retrying: ${request.method.toUpperCase()} ${request.url}`);
+    apiClient(request).catch(error => {
+      console.error('Failed to process queued request:', error);
+    });
+  });
+  
+  // Clear the queue
+  retryQueue.length = 0;
+}
+
+// Listen for online/offline events
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('Browser reports online status');
+    isOnline = true;
+    processRetryQueue();
+  });
+  
+  window.addEventListener('offline', () => {
+    console.log('Browser reports offline status');
+    isOnline = false;
+  });
+}
+
+// Add a ping method to check API health
+apiClient.checkHealth = async () => {
   try {
     const response = await apiClient.get('/health');
-    console.log('API connection successful:', response.data);
-    return { success: true, data: response.data };
+    return { 
+      success: true, 
+      status: response.status,
+      data: response.data,
+      serverTime: response.headers.date
+    };
   } catch (error) {
-    console.error('API connection failed:', error);
-    return { success: false, error };
+    return { 
+      success: false, 
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message
+    };
   }
 };
 

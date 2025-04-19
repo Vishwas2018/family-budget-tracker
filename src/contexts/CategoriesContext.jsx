@@ -10,17 +10,19 @@ const CategoriesContext = createContext(null);
 
 /**
  * Provider component for category-related state and operations
+ * With improved authentication check to prevent 401 errors
  */
 export function CategoriesProvider({ children }) {
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
   
-  // Categories query
+  // Categories query - Only fetch when authenticated
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoryService.getCategories(),
     select: (data) => data.data || [],
     staleTime: 1000 * 60 * 10, // 10 minutes
+    enabled: isAuthenticated, // Only run query if user is authenticated
   });
   
   // Admin-only mutations

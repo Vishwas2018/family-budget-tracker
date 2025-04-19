@@ -75,7 +75,7 @@ if (config.env === 'development') {
   app.use(morgan('dev'));
 }
 
-// API Routes - FIX: Use proper API routes configuration
+// API Routes - FIXED: Added /api prefix to match frontend requests
 app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);

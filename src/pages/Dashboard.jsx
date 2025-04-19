@@ -65,8 +65,13 @@ function Dashboard() {
     // Set current month for transaction filters
     setCurrentMonth();
 
-    // Show welcome message
+    // Use a ref to track if the welcome message has been shown
+  const welcomeShown = sessionStorage.getItem('welcomeShown');
+  if (!welcomeShown) {
+    // Show welcome message only once per session
     success(`Welcome back, ${user?.name || 'User'}!`);
+    sessionStorage.setItem('welcomeShown', 'true');
+  }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

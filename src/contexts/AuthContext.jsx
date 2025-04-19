@@ -1,21 +1,24 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import authService from '../api/authService';
-import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
-// Create Auth context
+// Create a single Auth context to be used throughout the application
 const AuthContext = createContext(null);
 
 /**
  * Authentication provider component that manages user authentication state
+ * With improved handling of redirection and error notifications
  */
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from localStorage on component mount
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -32,21 +35,39 @@ export function AuthProvider({ children }) {
               // If token is valid, set the user
               setUser(JSON.parse(storedUser));
               console.log('Successfully authenticated with stored token');
+
+              // If on login page, redirect to dashboard
+              if (location.pathname === '/login') {
+                navigate('/dashboard');
+              }
             } else {
-              // If token is invalid, clear storage
+              // If token is invalid, clear storage but don't redirect if on login/register pages
               localStorage.removeItem('token');
               localStorage.removeItem('user');
               console.log('Token validation failed - user will need to login');
+              
+              // Only redirect if not already on login or register page
+              if (location.pathname !== '/login' && location.pathname !== '/register') {
+                navigate('/login');
+              }
             }
           } catch (error) {
             // Handle token verification error
             console.error('Token validation error:', error);
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            
+            // Only redirect if not already on login or register page
+            if (location.pathname !== '/login' && location.pathname !== '/register') {
+              navigate('/login');
+            }
           }
         } else {
-          // No stored credentials found
+          // No stored credentials found - redirect if not on login or register page
           console.log('No stored credentials found - user needs to login');
+          if (location.pathname !== '/login' && location.pathname !== '/register') {
+            navigate('/login');
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -58,9 +79,13 @@ export function AuthProvider({ children }) {
     };
 
     initializeAuth();
-  }, []);
+  }, [navigate, location.pathname]);
 
-  // Login function
+  /**
+   * Handles user login with credentials
+   * @param {Object} credentials - User credentials (email, password)
+   * @returns {Object} Result with success status and optional error
+   */
   const login = async (credentials) => {
     try {
       setIsLoading(true);
@@ -80,9 +105,11 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       
       console.log('Login successful:', data.user.email);
+      toast.success('Login successful!');
       
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Redirect to dashboard or stored location
+      const from = location.state?.from || '/dashboard';
+      navigate(from, { replace: true });
       
       return { success: true };
     } catch (error) {
@@ -92,13 +119,18 @@ export function AuthProvider({ children }) {
                           'Login failed. Please check your credentials.';
       
       setAuthError(errorMessage);
+      toast.error(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Register function
+  /**
+   * Handles user registration with new account details
+   * @param {Object} userData - New user data (name, email, password)
+   * @returns {Object} Result with success status and optional error
+   */
   const register = async (userData) => {
     try {
       setIsLoading(true);
@@ -118,6 +150,7 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       
       console.log('Registration successful:', data.user.email);
+      toast.success('Registration successful!');
       
       // Redirect to dashboard
       navigate('/dashboard');
@@ -130,13 +163,16 @@ export function AuthProvider({ children }) {
                           'Registration failed. Please try again.';
       
       setAuthError(errorMessage);
+      toast.error(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout function
+  /**
+   * Handles user logout and cleanup
+   */
   const logout = () => {
     // Clear stored credentials
     localStorage.removeItem('token');
@@ -147,6 +183,7 @@ export function AuthProvider({ children }) {
     setAuthError(null);
     
     console.log('User logged out');
+    toast.success('Logged out successfully');
     
     // Redirect to login
     navigate('/login');
@@ -172,7 +209,8 @@ export function AuthProvider({ children }) {
 }
 
 /**
- * Hook to use the auth context
+ * Hook to use the auth context throughout the application
+ * @returns {Object} Authentication context with user state and methods
  */
 export function useAuth() {
   const context = useContext(AuthContext);

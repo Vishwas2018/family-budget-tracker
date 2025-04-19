@@ -33,14 +33,13 @@ export default defineConfig(({ command, mode }) => {
         port: 5173,
         open: true, // Automatically open browser
         proxy: {
-          // Important: This is the correct proxy configuration for the API
+          // FIXED: Keep the /api prefix (don't use rewrite) since we've modified the backend
           '/api': {
             target: 'http://localhost:5001',
             changeOrigin: true,
             secure: false,
-            ws: true, // Support WebSocket
-            // Don't rewrite paths - keep the /api prefix
-            // rewrite: (path) => path.replace(/^\/api/, ''),
+            ws: true,
+            // Removed the rewrite rule to match our backend routes
             configure: (proxy, _options) => {
               proxy.on('error', (err, _req, _res) => {
                 console.log('Proxy error:', err);

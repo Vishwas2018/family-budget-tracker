@@ -4,15 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import toast from 'react-hot-toast';
 import transactionService from '../api/transactionService';
+import { useAuth } from './AuthContext';
 
 // Create Transactions context
 const TransactionsContext = createContext(null);
 
 /**
  * Provider component for transaction-related state and operations
+ * With improved authentication check to prevent 401 errors
  */
 export function TransactionsProvider({ children }) {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   
   // State for current date filters
   const [dateRange, setDateRange] = useState(() => {
@@ -31,7 +34,7 @@ export function TransactionsProvider({ children }) {
     limit: 20,
   });
   
-  // Transactions query with filters
+  // Transactions query with filters - Only fetch when authenticated
   const transactionsQuery = useQuery({
     queryKey: ['transactions', { ...filters, ...dateRange }],
     queryFn: () => transactionService.getTransactions({
@@ -39,19 +42,21 @@ export function TransactionsProvider({ children }) {
       startDate: dateRange.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : undefined,
       endDate: dateRange.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : undefined,
     }),
+    enabled: isAuthenticated, // Only run query if user is authenticated
     keepPreviousData: true,
   });
   
-  // Transaction summary query
+  // Transaction summary query - Only fetch when authenticated
   const summaryQuery = useQuery({
     queryKey: ['transactions', 'summary', dateRange],
     queryFn: () => transactionService.getTransactionSummary({
       startDate: dateRange.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : undefined,
       endDate: dateRange.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : undefined,
     }),
+    enabled: isAuthenticated, // Only run query if user is authenticated
   });
   
-  // Category breakdown query
+  // Category breakdown query - Only fetch when authenticated
   const breakdownQuery = useQuery({
     queryKey: ['transactions', 'breakdown', { type: 'expense' }, dateRange],
     queryFn: () => transactionService.getCategoryBreakdown({
@@ -59,14 +64,16 @@ export function TransactionsProvider({ children }) {
       startDate: dateRange.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : undefined,
       endDate: dateRange.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : undefined,
     }),
+    enabled: isAuthenticated, // Only run query if user is authenticated
   });
   
-  // Monthly data query for reports
+  // Monthly data query for reports - Only fetch when authenticated
   const monthlyQuery = useQuery({
     queryKey: ['transactions', 'monthly', new Date().getFullYear()],
     queryFn: () => transactionService.getMonthlyTransactions({
       year: new Date().getFullYear(),
     }),
+    enabled: isAuthenticated, // Only run query if user is authenticated
   });
   
   // Create transaction mutation
@@ -129,12 +136,12 @@ export function TransactionsProvider({ children }) {
   
   // Combine state and functions into a single value
   const transactionsValue = {
-    // Queries
-    transactions: transactionsQuery.data?.transactions || [],
-    pagination: transactionsQuery.data?.pagination || { total: 0, page: 1, pages: 1 },
-    summary: summaryQuery.data || { income: 0, expenses: 0, balance: 0 },
-    breakdown: breakdownQuery.data?.breakdown || [],
-    monthlyData: monthlyQuery.data || [],
+    // Queries - Provide empty defaults when not authenticated
+    transactions: transactionsQuery.data?.data?.transactions || [],
+    pagination: transactionsQuery.data?.data?.pagination || { total: 0, page: 1, pages: 1 },
+    summary: summaryQuery.data?.data || { income: 0, expenses: 0, balance: 0 },
+    breakdown: breakdownQuery.data?.data?.breakdown || [],
+    monthlyData: monthlyQuery.data?.data || [],
     
     // Loading states
     isLoading: {
